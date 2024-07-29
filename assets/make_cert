@@ -33,8 +33,8 @@ else
     openssl x509 -req \
         -days 398 \
         -in $URL.csr \
-        -CA localhost.pem \
-        -CAkey localhost.key \
+        -CA myCA.pem \
+        -CAkey myCA.key \
         -CAcreateserial \
         -out $URL.crt \
         -extfile $HOST_EXT \

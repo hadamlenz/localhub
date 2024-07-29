@@ -1,0 +1,3 @@
+[[tls.certificates]]
+  certFile = "/opt/traefik/certs/whoami.test.crt"
+  keyFile = "/opt/traefik/certs/whoami.test.key"
