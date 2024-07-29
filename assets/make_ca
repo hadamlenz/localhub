@@ -1,4 +1,4 @@
 #!/bin/bash
 echo Making a CA
-openssl genrsa -des3 -out test.key 2048
-openssl req -x509 -new -nodes -key test.key -sha256 -days 1825 -out test.pem
+openssl genrsa -des3 -out ../traefik/certs/myCA.key 2048
+openssl req -x509 -new -nodes -key ../traefik/certs/myCA.key -sha256 -days 1825 -out ../traefik/certs/myCA.pem

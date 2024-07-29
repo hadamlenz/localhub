@@ -34,8 +34,8 @@ else
     openssl x509 -req \
         -days 398 \
         -in $URL.csr \
-        -CA myCA.pem \
-        -CAkey myCA.key \
+        -CA ../traefik/certs/myCA.pem \
+        -CAkey ../traefik/certs/myCA.key \
         -CAcreateserial \
         -out $URL.crt \
         -extfile $HOST_EXT \
