@@ -1,0 +1,147 @@
+version: "3.7"
+
+services:
+    traefik:
+        #image: "traefik:v2.6.1"
+        image: "traefik:v2.8.1"
+        container_name: "traefik"
+        platform: linux/arm64/v8
+        restart: always
+        command:
+            - "--api.insecure=true"
+            - "--log.level=DEBUG"
+            - "--providers.docker=true"
+            - "--providers.docker.network=local_traefik"
+            - "--providers.docker.exposedbydefault=false"
+            - "--entrypoints.web.address=:80"
+            - "--entrypoints.web.http.redirections.entrypoint.to=web-secure"
+            - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+            - "--entrypoints.web-secure.address=:443"
+            - "--entrypoints.mysql.address=:3306"
+            - "--providers.file.filename=/etc/traefik/dynamic/traefik.toml"
+        ports:
+            - "443:443"
+            - "80:80"
+            - "8080:8080"
+        dns:
+            - "192.168.1.230"
+        volumes:
+            - "/var/run/docker.sock:/var/run/docker.sock:ro"
+            # - /var/run/docker.sock:/var/run/docker.sock
+            - ./traefik/conf/traefik.toml:/etc/traefik/dynamic/traefik.toml
+            - ./traefik/certs:/opt/traefik/certs
+        networks: 
+            - local_traefik
+        links:
+            - 'whoami'
+    db:
+      # to import
+      # connect to shell -> docker-compose exec db /bin/bash
+      # microdnf update
+      # microdnf install -y epel-release
+      # microdnf install -y pv
+      # apt-get install pv
+      # cd docker-entrypoint-initdb.d
+      # pv sql.sql | mysql -u root -p {dbname}
+      # mysql -u root -p sites_unc_test < facilities.unc.edu.sql
+
+      # to export
+      # docker exec db /usr/bin/mysqldump -u root --password=root sites_unc > unc_sites.sql
+      # or
+      # mysqldump -u root -p unc_sites_dev `echo "show tables like 'wpsites_375_%';" | mysql -u root -p unc_sites_dev | sed '/Tables_in/d'` > 375.sql
+
+      image: 'mysql:latest'
+      command: '--default-authentication-plugin=mysql_native_password'
+      container_name: wpdb
+      platform: linux/arm64/v8
+      environment:
+          - VIRTUAL_PROTO=https
+          - MYSQL_ROOT_PASSWORD=root
+          - MYSQL_ROOT_HOST=%
+          # - MYSQL_USER=fuubar
+          # - MYSQL_PASSWORD=foobat
+      cap_add:
+          - SYS_NICE  # CAP_SYS_NICE
+      labels:
+          - "traefik.tcp.routers.mysql.rule=HostSNI(`*`)"
+          - "traefik.tcp.routers.mysql.entrypoints=mysql"
+          - "traefik.tcp.routers.mysql.service=mysql-svc"
+          - "traefik.tcp.services.mysql-svc.loadbalancer.server.port=3306"
+      volumes:
+          #- 'database-volume:/var/lib/mysql'
+          - './conf/mysql.cnf:/etc/mysql/conf.d/mysql.cnf'
+          - './mysql_data:/var/lib/mysql'
+          - './mysql-migration:/docker-entrypoint-initdb.d'
+      restart: always
+      ports:
+          - "4306:3306"
+      networks:
+          - local_traefik
+    db-backup:
+      # https://hub.docker.com/r/databack/mysql-backup
+      depends_on:
+          - db
+      image: databack/mysql-backup
+      restart: always
+      container_name: mysql_backups
+      volumes:
+          - './mysql_backups:/backups'
+          #- ./conf/mysql-post-backups.sh:/scripts.d/post-backup
+      environment:
+          - DB_DUMP_TARGET=/backups
+          - DB_USER=backup
+          - DB_PASS=backup
+          - DB_PORT=3306
+          - DB_DUMP_BEGIN=+1
+          - DB_SERVER=db
+      networks:
+          - local_traefik
+    phpmyadmin:
+      depends_on:
+          - db
+      image: phpmyadmin:latest
+      container_name: phpmyadmin
+    #   platform: linux/amd64
+      restart: always
+      environment:
+          - PMA_HOST=db
+          - PMA_PORT=3306
+          - MYSQL_USER=fuubar
+          - MYSQL_PASSWORD=foobat
+          - MYSQL_ROOT_PASSWORD=root
+          - ENV=development
+          - UPLOAD_LIMIT=20000000000
+      labels:
+          - "traefik.enable=true"
+          - "traefik.http.routers.phpmyadmin.rule=Host(`phpmyadmin.localhost`)"
+          - "traefik.http.routers.phpmyadmin.entrypoints=web-secure"
+          - "traefik.http.routers.phpmyadmin.tls=true"
+      expose:
+          - '80'
+          - '443'
+      networks:
+          - local_traefik
+    whoami:
+      image: "containous/whoami"
+      restart: always
+      container_name: "hello-world"
+      platform: linux/amd64
+      labels:
+          - "traefik.enable=true"
+          - "traefik.http.routers.whoami.rule=Host(`whoami.test`)"
+          - "traefik.http.routers.whoami.entrypoints=web-secure"
+          - "traefik.http.routers.whoami.tls=true"
+          - "traefik.tcp.services.whoami.loadbalancer.server.port=443"
+      networks: 
+          - local_traefik
+      expose:
+          - '80'
+          - '443'
+volumes:
+   database-volume:
+networks:
+    local_traefik:
+      ipam:
+        driver: default
+        config:
+            - subnet: 172.28.0.0/16

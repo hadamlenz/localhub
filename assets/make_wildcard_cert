@@ -1,0 +1,53 @@
+#!/bin/bash
+URL=""
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+echo $DIR
+while getopts u: option; do
+    case "${option}"
+    in
+        u) URL=${OPTARG};;
+    esac
+done
+
+if [ -z $URL ]; then
+   echo "you must add a url";
+else
+    echo "thank you for URL="$URL;
+    openssl genrsa -out $URL.key 2048
+    openssl req -new -sha256 \
+        -out $URL.csr \
+        -key $URL.key \
+        -config cert.conf
+
+    HOST_EXT=$DIR/$URL.ext
+
+    echo >$HOST_EXT
+    echo >>$HOST_EXT authorityKeyIdentifier=keyid,issuer
+    echo >>$HOST_EXT basicConstraints=CA:FALSE
+    echo >>$HOST_EXT keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+    echo >>$HOST_EXT subjectAltName = @alt_names
+    echo >>$HOST_EXT
+    echo >>$HOST_EXT [alt_names]
+    echo >>$HOST_EXT DNS.1 = $URL
+    echo >>$HOST_EXT DNS.2 = *.$URL
+
+    openssl x509 -req \
+        -days 398 \
+        -in $URL.csr \
+        -CA localhost.pem \
+        -CAkey localhost.key \
+        -CAcreateserial \
+        -out $URL.crt \
+        -extfile $HOST_EXT \
+        -sha256
+
+    if [ -f $URL.crt ]; then
+        echo 'cert has been made, cleaning up'
+        mv $URL.key ../traefik/certs/$URL.key
+        mv $URL.crt ../traefik/certs/$URL.crt
+        rm $URL.csr
+        rm $HOST_EXT
+    else
+        echo 'cert making failed'
+    fi
+fi

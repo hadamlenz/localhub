@@ -1,0 +1,9 @@
+## rename this to traefik.toml and add the servers you want to have certs
+
+[[tls.certificates]]
+  certFile = "/opt/traefik/certs/phpmyadmin.localhost.crt"
+  keyFile = "/opt/traefik/certs/phpmyadmin.localhost.key"
+
+[[tls.certificates]]
+  certFile = "/opt/traefik/certs/whoami.test.crt"
+  keyFile = "/opt/traefik/certs/whoami.test.key"
