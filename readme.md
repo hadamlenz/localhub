@@ -1,4 +1,7 @@
-add a CA
+`cd assets`
+`./make_ca`
+
+Import the CS to your system
 https://deliciousbrains.com/ssl-certificate-authority-for-local-https-development/
 
-add it to your system
+`./make_cert -u [daomin].test`
